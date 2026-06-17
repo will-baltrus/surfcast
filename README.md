@@ -1,7 +1,8 @@
 # Surfcast
 
-A tiny Flask web app for my intro software engineering class. It shows a form,
-you type something in, hit Submit, and it echoes your text back to the screen.
+A tiny Flask web app for my Applications in Software Architecture for Big Data
+course. It shows a form, you type something in, hit Submit, and it echoes your
+text back to the screen.
 
 ## Live URL
 
