@@ -33,10 +33,29 @@ https://surfcast-7dnb.onrender.com
 
 ## Data collector
 
-`src/collect_weather.py` fetches the current Boulder temperature from the
-Open-Meteo API and stores it in a SQLite database. Run it with:
+`src/collect_weather.py` fetches the current weather (temperature, wind speed,
+and wind direction) for the Oahu North Shore surf break from the Open-Meteo API
+and stores it in a SQLite database. Run it with:
 
        python src/collect_weather.py
 
 The first run creates the table automatically; each run adds one row to
-`instance/weather.sqlite3`.
+`instance/weather.sqlite3`. Tide and wave data will be added later from other
+sources.
+
+## Project goal and roadmap
+
+The goal of Surfcast is to project surf quality for breaks on Oahu and rank
+them against each other. The data collector above is the first step toward that.
+
+Planned work (documented here, not implemented yet):
+
+- Collect conditions for more Oahu breaks (for example Waikiki, Sunset and
+  Waimea), not just Pipeline.
+- Add more inputs that affect surf quality -- tide, and wave/swell height,
+  period and direction -- which need data sources beyond Open-Meteo.
+- Combine those inputs into a break-quality index that scores each break
+  relative to the other breaks on the island.
+
+For now the project just collects weather for the single Pipeline break, which
+is enough for this assignment.
