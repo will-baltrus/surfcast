@@ -1,12 +1,26 @@
 # Surfcast
 
-A tiny Flask web app for my Applications in Software Architecture for Big Data
-course. It shows a form, you type something in, hit Submit, and it echoes your
-text back to the screen.
+Surfcast collects surf conditions for several surf breaks on Oahu, gives each
+break a surf-quality score, and ranks the breaks against each other so you can
+see where to surf. It was built for my Applications in Software Architecture for
+Big Data course.
 
 ## Live URL
 
 https://surfcast-7dnb.onrender.com
+
+## What it does
+
+- Collects temperature, wind, wave height and wave period for a handful of Oahu
+  breaks from the Open-Meteo API.
+- Stores each reading in a SQLite database.
+- Scores each break 0-100 from its waves, period and wind, and ranks the breaks.
+- Shows the ranking on a web page with a form to look up a break's average score
+  over a date range.
+- Has a small JSON API and health/stats endpoints.
+
+See `docs/report.md` for the full write-up and `docs/requirements.md` and
+`docs/user_stories.md` for the requirements and stories.
 
 ## Run it locally
 
@@ -31,31 +45,45 @@ https://surfcast-7dnb.onrender.com
 
    Then open http://127.0.0.1:8000 in your browser.
 
-## Data collector
+## Collect data
 
-`src/collect_weather.py` fetches the current weather (temperature, wind speed,
-and wind direction) for the Oahu North Shore surf break from the Open-Meteo API
-and stores it in a SQLite database. Run it with:
+The collector fetches the current conditions for each break and stores a reading.
+Run it from the project root:
 
-       python src/collect_weather.py
+       python -m src.collect_weather
 
-The first run creates the table automatically; each run adds one row to
-`instance/weather.sqlite3`. Tide and wave data will be added later from other
-sources.
+The first run creates the database table automatically; each run adds one reading
+per break to `instance/surf.sqlite3`.
 
-## Project goal and roadmap
+## Collect through a message queue (optional)
 
-The goal of Surfcast is to project surf quality for breaks on Oahu and rank
-them against each other. The data collector above is the first step toward that.
+Instead of saving straight to the database, the collector can publish each reading
+to a RabbitMQ queue, and a consumer reads the queue and saves the readings. Set
+`RABBITMQ_URL` to your broker (for example a free CloudAMQP instance), then in one
+terminal start the consumer:
 
-Planned work (documented here, not implemented yet):
+       python -m src.consumer
 
-- Collect conditions for more Oahu breaks (for example Waikiki, Sunset and
-  Waimea), not just Pipeline.
-- Add more inputs that affect surf quality -- tide, and wave/swell height,
-  period and direction -- which need data sources beyond Open-Meteo.
-- Combine those inputs into a break-quality index that scores each break
-  relative to the other breaks on the island.
+and in another, run the collector:
 
-For now the project just collects weather for the single Pipeline break, which
-is enough for this assignment.
+       python -m src.collect_weather
+
+## Run the tests
+
+       python -m unittest discover
+
+## Endpoints
+
+- `/` - ranked breaks and the average-score form
+- `/api/breaks` - ranked breaks as JSON
+- `/api/breaks/<name>/average/<start>/<end>` - average score for a break
+- `/health` - health check
+- `/stats` - how much data has been collected
+
+## Roadmap
+
+The breaks and wave data are in place. Still planned:
+
+- More Oahu breaks.
+- Tide and swell direction, which would make the score more accurate.
+- Tuning the surf-quality score against real conditions.
