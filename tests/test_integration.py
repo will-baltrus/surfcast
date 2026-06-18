@@ -69,6 +69,12 @@ class TestApiIntegration(unittest.TestCase):
         self.assertIn(b"Waikiki", response.data)
         self.assertIn(b"Pipeline", response.data)
 
+    def test_health_and_stats(self):
+        self.assertEqual(self.client.get("/health").get_json()["status"], "ok")
+        stats = self.client.get("/stats").get_json()
+        self.assertEqual(stats["total_readings"], 2)
+        self.assertEqual(stats["readings_per_break"]["Waikiki"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
