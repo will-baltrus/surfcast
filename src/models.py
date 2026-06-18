@@ -15,10 +15,14 @@ _INSTANCE_DIR = os.path.join(_BASE_DIR, "instance")
 DB_URI = "sqlite:///" + os.path.join(_INSTANCE_DIR, "surf.sqlite3")
 
 
-# Point a Flask app at the shared database and create the table if needed.
+# Point a Flask app at the shared database. The location can be overridden with
+# the SURFCAST_DATABASE_URI environment variable, which the tests use to run
+# against a throwaway database.
 def init_db(app):
     os.makedirs(_INSTANCE_DIR, exist_ok=True)
-    app.config["SQLALCHEMY_DATABASE_URI"] = DB_URI
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+        "SURFCAST_DATABASE_URI", DB_URI
+    )
     db.init_app(app)
 
 
