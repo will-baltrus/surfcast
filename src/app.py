@@ -84,7 +84,11 @@ HOME_PAGE = """
 
 <h2>Average score for a break</h2>
 <form action="/average" method="get">
-  <input name="break_name" placeholder="Pipeline">
+  <select name="break_name">
+    {% for name in breaks %}
+    <option value="{{ name }}">{{ name }}</option>
+    {% endfor %}
+  </select>
   <input name="start" placeholder="2026-06-01">
   <input name="end" placeholder="2026-06-30">
   <input type="submit" value="Show average">
@@ -103,8 +107,10 @@ AVERAGE_PAGE = """
 
 @app.route("/")
 def home():
-    ranked = rank_breaks(latest_readings())
-    return render_template_string(HOME_PAGE, ranked=ranked)
+    readings = latest_readings()
+    ranked = rank_breaks(readings)
+    breaks = sorted(reading.break_name for reading in readings)
+    return render_template_string(HOME_PAGE, ranked=ranked, breaks=breaks)
 
 
 @app.route("/average")
