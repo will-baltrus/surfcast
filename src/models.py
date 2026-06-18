@@ -20,9 +20,8 @@ DB_URI = "sqlite:///" + os.path.join(_INSTANCE_DIR, "surf.sqlite3")
 # against a throwaway database.
 def init_db(app):
     os.makedirs(_INSTANCE_DIR, exist_ok=True)
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-        "SURFCAST_DATABASE_URI", DB_URI
-    )
+    # `or DB_URI` so a missing OR blank value both fall back to local SQLite.
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("SURFCAST_DATABASE_URI") or DB_URI
     db.init_app(app)
 
 
