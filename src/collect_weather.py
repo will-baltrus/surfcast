@@ -1,36 +1,27 @@
 #!/usr/bin/env python3
 import requests
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+
+from src.models import db, init_db, Reading
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///weather.sqlite3"
+init_db(app)
 
-db = SQLAlchemy(app)
-
-# Surf spot we are collecting conditions for: Oahu, North Shore (Pipeline).
-LATITUDE = 21.665
-LONGITUDE = -158.053
-
-
-# The database model / schema: one row per reading for the surf spot.
-# Tide and wave data (height, period, direction) will come from other sources
-# and can be added as more columns later.
-class Weather(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    recorded_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    temperature = db.Column(db.Float, nullable=False)
-    wind_speed = db.Column(db.Float, nullable=False)
-    wind_direction = db.Column(db.Integer, nullable=False)
+# Surf breaks on Oahu we collect conditions for, with their coordinates.
+BREAKS = {
+    "Pipeline": (21.665, -158.053),
+    "Sunset Beach": (21.679, -158.041),
+    "Waimea Bay": (21.642, -158.066),
+    "Waikiki": (21.276, -157.827),
+}
 
 
-# Fetch the current temperature, wind speed and wind direction for the surf
-# spot from the Open-Meteo API.
-def get_weather():
+# Get the current temperature and wind for a break from the Open-Meteo
+# forecast API.
+def get_weather(latitude, longitude):
     url = (
         "https://api.open-meteo.com/v1/forecast"
-        f"?latitude={LATITUDE}&longitude={LONGITUDE}"
+        f"?latitude={latitude}&longitude={longitude}"
         "&current=temperature_2m,wind_speed_10m,wind_direction_10m"
     )
     current = requests.get(url).json()["current"]
@@ -41,22 +32,49 @@ def get_weather():
     )
 
 
+# Get the current wave height and period for a break from the Open-Meteo
+# marine API.
+def get_waves(latitude, longitude):
+    url = (
+        "https://marine-api.open-meteo.com/v1/marine"
+        f"?latitude={latitude}&longitude={longitude}"
+        "&current=wave_height,wave_period"
+    )
+    current = requests.get(url).json()["current"]
+    return (
+        current["wave_height"],
+        current["wave_period"],
+    )
+
+
+# Fetch conditions for one break and build a Reading (not saved yet).
+def collect_break(name, latitude, longitude):
+    temperature, wind_speed, wind_direction = get_weather(latitude, longitude)
+    wave_height, wave_period = get_waves(latitude, longitude)
+    return Reading(
+        break_name=name,
+        temperature=temperature,
+        wind_speed=wind_speed,
+        wind_direction=wind_direction,
+        wave_height=wave_height,
+        wave_period=wave_period,
+    )
+
+
+# Collect every break and save the readings to the database.
+def collect_all():
+    for name, (latitude, longitude) in BREAKS.items():
+        reading = collect_break(name, latitude, longitude)
+        db.session.add(reading)
+        db.session.commit()
+        print(
+            f"Saved {name} - waves: {reading.wave_height}m at "
+            f"{reading.wave_period}s, wind: {reading.wind_speed} km/h, "
+            f"temp: {reading.temperature}C"
+        )
+
+
 if __name__ == "__main__":
     with app.app_context():
-        # Database setup: create the table if it does not exist yet.
         db.create_all()
-
-        # Fetch the data and store it as a new row.
-        temperature, wind_speed, wind_direction = get_weather()
-        new_entry = Weather(
-            temperature=temperature,
-            wind_speed=wind_speed,
-            wind_direction=wind_direction,
-        )
-        db.session.add(new_entry)
-        db.session.commit()
-
-        print(
-            f"Saved reading - temp: {temperature}C, "
-            f"wind: {wind_speed} km/h from {wind_direction}deg"
-        )
+        collect_all()
