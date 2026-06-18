@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging
 from datetime import datetime, timedelta
 
 from flask import Flask, request, jsonify, render_template_string
@@ -8,6 +9,16 @@ from src.analyzer import rank_breaks, average_score
 
 app = Flask(__name__)
 init_db(app)
+
+# Log every request so we can see what is happening in production.
+logging.basicConfig(level=logging.INFO)
+
+
+@app.after_request
+def log_request(response):
+    app.logger.info("%s %s -> %s", request.method, request.path, response.status_code)
+    return response
+
 
 # Make sure the table exists when the app starts (the database is empty on a
 # fresh deploy until the collector has run).
@@ -143,5 +154,33 @@ def api_average(name, start, end):
             "end": end,
             "readings": len(readings),
             "average_score": average_score(readings),
+        }
+    )
+
+
+# Health check for uptime monitoring. Also confirms the database is reachable.
+@app.route("/health")
+def health():
+    try:
+        Reading.query.first()
+        return jsonify({"status": "ok"})
+    except Exception:
+        app.logger.exception("health check failed")
+        return jsonify({"status": "error"}), 500
+
+
+# Instrumentation: how much data we have collected and when.
+@app.route("/stats")
+def stats():
+    readings = Reading.query.all()
+    per_break = {}
+    for reading in readings:
+        per_break[reading.break_name] = per_break.get(reading.break_name, 0) + 1
+    latest = Reading.query.order_by(Reading.recorded_at.desc()).first()
+    return jsonify(
+        {
+            "total_readings": len(readings),
+            "readings_per_break": per_break,
+            "last_collected_at": latest.recorded_at.isoformat() if latest else None,
         }
     )
