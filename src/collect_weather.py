@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
+import os
+import json
+
 import requests
 from flask import Flask
 
 from src.models import db, init_db, Reading
+from src.messaging import QUEUE_NAME, connect, reading_to_dict
 
 app = Flask(__name__)
 init_db(app)
@@ -61,17 +65,42 @@ def collect_break(name, latitude, longitude):
     )
 
 
-# Collect every break and save the readings to the database.
+# Save a reading straight to the database.
+def save_reading(reading):
+    db.session.add(reading)
+    db.session.commit()
+
+
+# Send a reading to the RabbitMQ queue instead of saving it directly. A
+# consumer reads the queue and does the saving (see consumer.py).
+def publish_reading(reading):
+    connection = connect()
+    channel = connection.channel()
+    channel.queue_declare(queue=QUEUE_NAME, durable=True)
+    channel.basic_publish(
+        exchange="",
+        routing_key=QUEUE_NAME,
+        body=json.dumps(reading_to_dict(reading)),
+    )
+    connection.close()
+
+
+# Collect every break. If RABBITMQ_URL is set we publish each reading to the
+# queue; otherwise we save it straight to the database.
 def collect_all():
+    use_queue = "RABBITMQ_URL" in os.environ
     for name, (latitude, longitude) in BREAKS.items():
         reading = collect_break(name, latitude, longitude)
-        db.session.add(reading)
-        db.session.commit()
-        print(
-            f"Saved {name} - waves: {reading.wave_height}m at "
-            f"{reading.wave_period}s, wind: {reading.wind_speed} km/h, "
-            f"temp: {reading.temperature}C"
-        )
+        if use_queue:
+            publish_reading(reading)
+            print(f"Published {name} to the queue")
+        else:
+            save_reading(reading)
+            print(
+                f"Saved {name} - waves: {reading.wave_height}m at "
+                f"{reading.wave_period}s, wind: {reading.wind_speed} km/h, "
+                f"temp: {reading.temperature}C"
+            )
 
 
 if __name__ == "__main__":
