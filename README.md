@@ -72,6 +72,19 @@ and in another, run the collector:
 
        python -m unittest discover
 
+## Production database and scheduled collection
+
+Locally the app uses SQLite. In production the live site can't keep SQLite data
+(Render's free tier wipes the disk on restart), so it uses a hosted Postgres
+database instead. The database location is read from the `SURFCAST_DATABASE_URI`
+environment variable, so no code changes are needed - the web service on Render
+and the collector both point at the same Postgres by setting that variable.
+
+The collector runs on a schedule with GitHub Actions
+(`.github/workflows/collect.yml`, every 3 hours) and writes to the production
+Postgres using a `SURFCAST_DATABASE_URI` repository secret. It can also be run on
+demand from the Actions tab.
+
 ## Endpoints
 
 - `/` - ranked breaks and the average-score form

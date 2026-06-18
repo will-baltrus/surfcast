@@ -40,11 +40,14 @@ message queue, and exposes monitoring endpoints.
 
 - **Python and Flask** for the web app. Flask is small and was the framework used
   in the course, so it kept the app simple to build and to deploy.
-- **SQLite with Flask-SQLAlchemy** for storage. The readings are uniform,
-  table-shaped rows (a break name, a time, and a few numbers), which is exactly
-  what a SQL database is good at, so a relational store fit better than a NoSQL
-  one. SQLite needs no separate server, which keeps the project easy to run and
-  free to host.
+- **SQL storage with Flask-SQLAlchemy.** The readings are uniform, table-shaped
+  rows (a break name, a time, and a few numbers), which is exactly what a SQL
+  database is good at, so a relational store fit better than a NoSQL one. Locally
+  the app uses SQLite because it needs no separate server. In production it uses a
+  hosted Postgres database instead, because Render's free tier wipes the local
+  disk on restart so SQLite data would not survive there. The database location is
+  read from the `SURFCAST_DATABASE_URI` environment variable, so the same code
+  runs against either one with no changes.
 - **Open-Meteo** as the data source. It is free, needs no API key, and has both a
   normal forecast API (temperature and wind) and a marine API (wave height and
   period), so it covers everything the score needs from one provider.
@@ -135,6 +138,11 @@ installs the dependencies and runs the whole test suite. Delivery is continuous
 too: Render is connected to the main branch and redeploys the live site
 automatically whenever main is updated.
 
+The data collection also runs on a schedule with GitHub Actions
+(`.github/workflows/collect.yml`, every three hours). That workflow runs the
+collector against the production Postgres database using a `SURFCAST_DATABASE_URI`
+secret, which keeps the live site's data fresh without a paid scheduler.
+
 ### Monitoring
 
 The app logs every request and has two endpoints for monitoring: `/health`, which
@@ -146,8 +154,12 @@ count per break, and when the last reading was stored.
 
 - Python 3.14.
 - The packages in `requirements.txt` (Flask, gunicorn, Flask-SQLAlchemy,
-  requests, pika).
+  requests, pika, psycopg2-binary).
 - Internet access for the collector to reach the Open-Meteo API.
+- For production data: a hosted Postgres database, with its connection string in
+  the `SURFCAST_DATABASE_URI` environment variable on both the Render web service
+  and the GitHub Actions collector (as a repository secret). Without it the app
+  falls back to local SQLite.
 - For the message-queue path: a RabbitMQ broker (a free CloudAMQP instance works)
   with its connection string in the `RABBITMQ_URL` environment variable.
 - For hosting: a Render web service running `gunicorn src.app:app`.
@@ -175,8 +187,7 @@ count per break, and when the last reading was stored.
 - The score is a simple heuristic, not a validated surf model. It could be tuned
   with real surfer feedback or take wind direction (offshore vs onshore) into
   account per break.
-- On the free Render tier the collector is not scheduled, so the live database is
-  populated by running the collector manually or on a schedule elsewhere. A paid
-  scheduler or a small always-on worker would automate this.
+- The free Render web service sleeps when idle, so the first visit after a while
+  is slow while the instance wakes up. A paid instance would stay awake.
 - Only a handful of breaks and a few conditions are tracked. Tide and swell
   direction would make the score more accurate, and more breaks could be added.
